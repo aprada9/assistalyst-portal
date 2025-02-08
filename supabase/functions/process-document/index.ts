@@ -1,6 +1,5 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { Configuration, OpenAIApi } from 'https://esm.sh/openai@3.2.1'
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
 
 const corsHeaders = {
@@ -23,11 +22,7 @@ serve(async (req) => {
       throw new Error('OPENAI_API_KEY is not set')
     }
 
-    // Initialize OpenAI
-    const configuration = new Configuration({
-      apiKey: Deno.env.get('OPENAI_API_KEY'),
-    })
-    const openai = new OpenAIApi(configuration)
+    console.log('Preparing request to OpenAI')
 
     // Prepare the prompt based on summary type and size
     let prompt = `${summaryType === 'bullets' ? 'Create a bullet-point summary' : 'Write a comprehensive summary'} of the following text. `
@@ -46,24 +41,38 @@ serve(async (req) => {
 
     console.log('Making request to OpenAI with prompt:', prompt)
 
-    // Call OpenAI API
-    const completion = await openai.createChatCompletion({
-      model: "gpt-3.5-turbo",
-      messages: [
-        {
-          role: "system",
-          content: prompt
-        },
-        {
-          role: "user",
-          content: text
-        }
-      ],
-    })
+    // Call OpenAI API directly instead of using the SDK
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: "gpt-3.5-turbo",
+        messages: [
+          {
+            role: "system",
+            content: prompt
+          },
+          {
+            role: "user",
+            content: text
+          }
+        ],
+      })
+    });
 
-    const summary = completion.data.choices[0]?.message?.content || 'Unable to generate summary'
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('OpenAI API error:', error);
+      throw new Error('Failed to generate summary');
+    }
 
-    console.log('Generated summary:', summary)
+    const data = await response.json();
+    const summary = data.choices[0]?.message?.content || 'Unable to generate summary';
+
+    console.log('Generated summary:', summary);
 
     // Return the result
     return new Response(
