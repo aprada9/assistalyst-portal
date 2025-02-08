@@ -75,42 +75,74 @@ export default function Index() {
         }
 
         result = processingData.summary;
-      } else {
-        // Placeholder for search functionality
-        result = "Search functionality coming soon...";
-      }
 
-      // Store the message in Supabase
-      const { error: insertError } = await supabase
-        .from('messages')
-        .insert([
+        // Create a new message object
+        const messageData = {
+          content: result,
+          type: 'assistant',
+          document_type: formData.documentType,
+          summary_type: formData.summaryType,
+          summary_size: formData.summarySize,
+          web_source: formData.webSource,
+          search_query: formData.searchQuery,
+          custom_webs: formData.customWebs
+        };
+
+        // Store the message in Supabase
+        const { error: insertError } = await supabase
+          .from('messages')
+          .insert([messageData]);
+
+        if (insertError) {
+          console.error('Error inserting message:', insertError);
+          throw new Error(insertError.message);
+        }
+
+        // Update local state
+        setMessages(prev => [
+          ...prev,
           {
-            content: result,
+            id: Date.now().toString(),
             type: 'assistant',
-            document_type: formData.documentType,
-            summary_type: formData.summaryType,
-            summary_size: formData.summarySize,
-            web_source: formData.webSource,
-            search_query: formData.searchQuery,
-            custom_webs: formData.customWebs
+            content: result,
+            timestamp: new Date()
           }
         ]);
 
-      if (insertError) {
-        throw new Error(insertError.message);
-      }
-
-      setMessages(prev => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          type: 'assistant',
+        toast.success('Summary generated!');
+      } else {
+        // Placeholder for search functionality
+        result = "Search functionality coming soon...";
+        
+        const messageData = {
           content: result,
-          timestamp: new Date()
-        }
-      ]);
+          type: 'assistant',
+          web_source: formData.webSource,
+          search_query: formData.searchQuery,
+          custom_webs: formData.customWebs
+        };
 
-      toast.success(currentStep === 'summary' ? 'Summary generated!' : 'Search completed!');
+        const { error: insertError } = await supabase
+          .from('messages')
+          .insert([messageData]);
+
+        if (insertError) {
+          console.error('Error inserting message:', insertError);
+          throw new Error(insertError.message);
+        }
+
+        setMessages(prev => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            type: 'assistant',
+            content: result,
+            timestamp: new Date()
+          }
+        ]);
+
+        toast.success('Search completed!');
+      }
     } catch (error) {
       console.error('Error processing request:', error);
       toast.error('An error occurred. Please try again.');
