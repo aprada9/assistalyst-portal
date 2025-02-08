@@ -9,7 +9,48 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      messages: {
+        Row: {
+          content: string
+          created_at: string | null
+          custom_webs: string | null
+          document_type: string | null
+          id: string
+          search_query: string | null
+          summary_size: string | null
+          summary_type: string | null
+          type: string
+          user_id: string | null
+          web_source: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          custom_webs?: string | null
+          document_type?: string | null
+          id?: string
+          search_query?: string | null
+          summary_size?: string | null
+          summary_type?: string | null
+          type: string
+          user_id?: string | null
+          web_source?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          custom_webs?: string | null
+          document_type?: string | null
+          id?: string
+          search_query?: string | null
+          summary_size?: string | null
+          summary_type?: string | null
+          type?: string
+          user_id?: string | null
+          web_source?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

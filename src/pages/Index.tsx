@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Search, Upload, Link, File, Type, ChevronLeft, Sparkles } from 'lucide-react';
+import { FileText, Search, Upload, Link, Type, ChevronLeft, Sparkles } from 'lucide-react';
 import { ChatMessage, FormData, Step } from '@/types';
 import { toast } from 'sonner';
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Index() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -56,19 +57,55 @@ export default function Index() {
   const handleSubmit = async () => {
     try {
       setCurrentStep('processing');
-      // Placeholder for API call
-      const mockResponse = {
-        result: currentStep === 'summary' 
-          ? "Here's your document summary..."
-          : "Here are your search results..."
-      };
+      
+      let result: string;
+      
+      if (currentStep === 'summary') {
+        // Call the edge function for document processing
+        const { data: processingData, error: processingError } = await supabase.functions.invoke('process-document', {
+          body: {
+            text: formData.pastedText,
+            summaryType: formData.summaryType,
+            summarySize: formData.summarySize
+          }
+        });
+
+        if (processingError) {
+          throw new Error(processingError.message);
+        }
+
+        result = processingData.summary;
+      } else {
+        // Placeholder for search functionality
+        result = "Search functionality coming soon...";
+      }
+
+      // Store the message in Supabase
+      const { error: insertError } = await supabase
+        .from('messages')
+        .insert([
+          {
+            content: result,
+            type: 'assistant',
+            document_type: formData.documentType,
+            summary_type: formData.summaryType,
+            summary_size: formData.summarySize,
+            web_source: formData.webSource,
+            search_query: formData.searchQuery,
+            custom_webs: formData.customWebs
+          }
+        ]);
+
+      if (insertError) {
+        throw new Error(insertError.message);
+      }
 
       setMessages(prev => [
         ...prev,
         {
           id: Date.now().toString(),
           type: 'assistant',
-          content: mockResponse.result,
+          content: result,
           timestamp: new Date()
         }
       ]);
