@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { Configuration, OpenAIApi } from 'https://esm.sh/openai@3.2.1'
+import "https://deno.land/x/xhr@0.1.0/mod.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,6 +18,10 @@ serve(async (req) => {
 
   try {
     const { text, summaryType, summarySize } = await req.json()
+
+    if (!Deno.env.get('OPENAI_API_KEY')) {
+      throw new Error('OPENAI_API_KEY is not set')
+    }
 
     // Initialize OpenAI
     const configuration = new Configuration({
@@ -39,6 +44,8 @@ serve(async (req) => {
         break
     }
 
+    console.log('Making request to OpenAI with prompt:', prompt)
+
     // Call OpenAI API
     const completion = await openai.createChatCompletion({
       model: "gpt-3.5-turbo",
@@ -55,6 +62,8 @@ serve(async (req) => {
     })
 
     const summary = completion.data.choices[0]?.message?.content || 'Unable to generate summary'
+
+    console.log('Generated summary:', summary)
 
     // Return the result
     return new Response(
