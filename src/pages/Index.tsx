@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -69,6 +68,12 @@ export default function Index() {
     }
   };
 
+  const [searchResult, setSearchResult] = useState<{
+    result: string;
+    citations: Array<{ title: string; url: string }>;
+    related_questions: string[];
+  } | null>(null);
+
   const handleSubmit = async () => {
     try {
       setCurrentStep('processing');
@@ -76,7 +81,6 @@ export default function Index() {
       let result: string;
       
       if (currentStep === 'summary') {
-        // Call the edge function for document processing
         const { data: processingData, error: processingError } = await supabase.functions.invoke('process-document', {
           body: {
             text: formData.pastedText,
@@ -91,7 +95,6 @@ export default function Index() {
 
         result = processingData.summary;
 
-        // Create a new message object
         const messageData = {
           content: result,
           type: 'assistant',
@@ -103,7 +106,6 @@ export default function Index() {
           custom_webs: formData.customWebs
         };
 
-        // Store the message in Supabase
         const { error: insertError } = await supabase
           .from('messages')
           .insert([messageData]);
@@ -113,7 +115,6 @@ export default function Index() {
           throw new Error(insertError.message);
         }
 
-        // Update local state
         setMessages(prev => [
           ...prev,
           {
@@ -126,8 +127,23 @@ export default function Index() {
 
         toast.success('Summary generated!');
       } else if (currentStep === 'search') {
-        // Placeholder for search functionality
-        result = "Search functionality coming soon...";
+        const { data: searchData, error: searchError } = await supabase.functions.invoke(
+          'process-search',
+          {
+            body: {
+              query: formData.searchQuery,
+              webSource: formData.webSource,
+              customWebs: formData.customWebs
+            }
+          }
+        );
+
+        if (searchError) {
+          throw new Error(searchError.message);
+        }
+
+        setSearchResult(searchData);
+        result = searchData.result;
         
         const messageData = {
           content: result,
@@ -178,13 +194,11 @@ export default function Index() {
 
         result = ocrData.text;
 
-        // Create a new message object
         const messageData = {
           content: result,
           type: 'assistant'
         };
 
-        // Store the message in Supabase
         const { error: insertError } = await supabase
           .from('messages')
           .insert([messageData]);
@@ -194,7 +208,6 @@ export default function Index() {
           throw new Error(insertError.message);
         }
 
-        // Update local state
         setMessages(prev => [
           ...prev,
           {
@@ -443,7 +456,57 @@ export default function Index() {
                         : 'bg-secondary/5 border-secondary/10'
                     }`}
                   >
-                    {message.content}
+                    <div className="space-y-4">
+                      <div className="prose max-w-none">
+                        {message.content}
+                      </div>
+                      
+                      {searchResult && message.type === 'assistant' && (
+                        <>
+                          {searchResult.citations.length > 0 && (
+                            <div className="mt-4 border-t pt-4">
+                              <h4 className="font-semibold mb-2">Citations</h4>
+                              <ul className="space-y-2">
+                                {searchResult.citations.map((citation, index) => (
+                                  <li key={index}>
+                                    <a 
+                                      href={citation.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-primary hover:underline flex items-center gap-2"
+                                    >
+                                      <Link className="w-4 h-4" />
+                                      {citation.title}
+                                    </a>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {searchResult.related_questions.length > 0 && (
+                            <div className="mt-4 border-t pt-4">
+                              <h4 className="font-semibold mb-2">Related Questions</h4>
+                              <ul className="space-y-2">
+                                {searchResult.related_questions.map((question, index) => (
+                                  <li 
+                                    key={index}
+                                    className="text-primary hover:bg-primary/5 p-2 rounded-md cursor-pointer flex items-center gap-2"
+                                    onClick={() => {
+                                      setFormData(prev => ({ ...prev, searchQuery: question }));
+                                      handleSubmit();
+                                    }}
+                                  >
+                                    <Search className="w-4 h-4" />
+                                    {question}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </Card>
                 ))}
               </div>

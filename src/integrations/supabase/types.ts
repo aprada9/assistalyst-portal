@@ -51,6 +51,36 @@ export type Database = {
         }
         Relationships: []
       }
+      search_results: {
+        Row: {
+          citations: Json | null
+          created_at: string | null
+          custom_webs: string | null
+          id: string
+          query: string
+          result: string
+          web_source: string
+        }
+        Insert: {
+          citations?: Json | null
+          created_at?: string | null
+          custom_webs?: string | null
+          id?: string
+          query: string
+          result: string
+          web_source: string
+        }
+        Update: {
+          citations?: Json | null
+          created_at?: string | null
+          custom_webs?: string | null
+          id?: string
+          query?: string
+          result?: string
+          web_source?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
