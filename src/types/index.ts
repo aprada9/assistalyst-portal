@@ -17,4 +17,4 @@ export interface DocumentFormData {
   file: File | null;
 }
 
-export type Step = 'initial' | 'summary' | 'search' | 'ocr' | 'processing';
+export type Step = 'initial' | 'summary' | 'search' | 'miniplex' | 'ocr' | 'processing';

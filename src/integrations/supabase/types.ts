@@ -51,6 +51,39 @@ export type Database = {
         }
         Relationships: []
       }
+      miniplex_results: {
+        Row: {
+          citations: Json
+          created_at: string
+          custom_webs: string | null
+          id: string
+          query: string
+          related_questions: Json | null
+          result: string
+          web_source: string
+        }
+        Insert: {
+          citations?: Json
+          created_at?: string
+          custom_webs?: string | null
+          id?: string
+          query: string
+          related_questions?: Json | null
+          result: string
+          web_source: string
+        }
+        Update: {
+          citations?: Json
+          created_at?: string
+          custom_webs?: string | null
+          id?: string
+          query?: string
+          related_questions?: Json | null
+          result?: string
+          web_source?: string
+        }
+        Relationships: []
+      }
       search_results: {
         Row: {
           citations: Json | null

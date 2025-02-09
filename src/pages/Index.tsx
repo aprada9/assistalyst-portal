@@ -37,6 +37,12 @@ export default function Index() {
       label: 'Specialized Search', 
       description: 'Search across multiple sources with citations' 
     },
+    {
+      id: 'miniplex',
+      icon: <Sparkles className="w-5 h-5" />,
+      label: 'MiniPlex Search',
+      description: 'Open-source AI search with citations'
+    },
     { 
       id: 'ocr', 
       icon: <Upload className="w-5 h-5" />, 
@@ -173,6 +179,53 @@ export default function Index() {
         ]);
 
         toast.success('Search completed!');
+      } else if (currentStep === 'miniplex') {
+        const { data: searchData, error: searchError } = await supabase.functions.invoke(
+          'process-miniplex',
+          {
+            body: {
+              query: formData.searchQuery,
+              webSource: formData.webSource,
+              customWebs: formData.customWebs
+            }
+          }
+        );
+
+        if (searchError) {
+          throw new Error(searchError.message);
+        }
+
+        setSearchResult(searchData);
+        result = searchData.result;
+        
+        const messageData = {
+          content: result,
+          type: 'assistant',
+          web_source: formData.webSource,
+          search_query: formData.searchQuery,
+          custom_webs: formData.customWebs
+        };
+
+        const { error: insertError } = await supabase
+          .from('messages')
+          .insert([messageData]);
+
+        if (insertError) {
+          console.error('Error inserting message:', insertError);
+          throw new Error(insertError.message);
+        }
+
+        setMessages(prev => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            type: 'assistant',
+            content: result,
+            timestamp: new Date()
+          }
+        ]);
+
+        toast.success('MiniPlex search completed!');
       } else if (currentStep === 'ocr') {
         if (!formData.file) {
           throw new Error('Please upload a file');
@@ -394,6 +447,60 @@ export default function Index() {
     </div>
   );
 
+  const renderMiniPlexForm = () => (
+    <div className="space-y-6 p-4 animate-in">
+      <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => handleNavigate('initial')}
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </Button>
+        <h2 className="text-lg font-semibold">MiniPlex Search</h2>
+      </div>
+
+      <div className="space-y-4">
+        <Input
+          placeholder="Enter your search query..."
+          value={formData.searchQuery}
+          onChange={(e) => setFormData({ ...formData, searchQuery: e.target.value })}
+        />
+
+        <Select
+          value={formData.webSource}
+          onValueChange={(value) => setFormData({ ...formData, webSource: value as any })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select source" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Sources</SelectItem>
+            <SelectItem value="boe">BOE</SelectItem>
+            <SelectItem value="borne">BORNE</SelectItem>
+            <SelectItem value="custom">Custom Sources</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {formData.webSource === 'custom' && (
+          <Input
+            placeholder="Enter custom websites (comma-separated)"
+            value={formData.customWebs}
+            onChange={(e) => setFormData({ ...formData, customWebs: e.target.value })}
+          />
+        )}
+
+        <Button 
+          className="w-full"
+          onClick={handleSubmit}
+        >
+          <Sparkles className="w-4 h-4 mr-2" />
+          Search with MiniPlex
+        </Button>
+      </div>
+    </div>
+  );
+
   const renderOCRForm = () => (
     <div className="space-y-6 p-4 animate-in">
       <div className="flex items-center gap-2">
@@ -444,6 +551,7 @@ export default function Index() {
             {currentStep === 'initial' && renderInitialView()}
             {currentStep === 'summary' && renderSummaryForm()}
             {currentStep === 'search' && renderSearchForm()}
+            {currentStep === 'miniplex' && renderMiniPlexForm()}
             {currentStep === 'ocr' && renderOCRForm()}
             {currentStep === 'processing' && (
               <div className="p-4 space-y-4">
