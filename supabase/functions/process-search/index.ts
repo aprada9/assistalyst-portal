@@ -50,7 +50,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: 'You are a helpful assistant that provides accurate information with citations. Always be concise and clear.'
+            content: 'You are a helpful assistant that provides accurate information with citations. Always be concise and clear. Use [number] format to cite sources, and make sure to list them at the end of your response.'
           },
           {
             role: 'user',
@@ -75,12 +75,20 @@ serve(async (req) => {
     // Extract citations from the response
     const citations = data.references || [];
 
+    // Process the response to replace citation numbers with links
+    let processedContent = data.choices[0].message.content;
+    citations.forEach((citation: { title: string; url: string }, index: number) => {
+      const citationMark = `[${index + 1}]`;
+      const citationLink = `<a href="${citation.url}" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline inline-flex items-center gap-1">${citationMark}<span class="text-xs text-muted-foreground">(${citation.title})</span></a>`;
+      processedContent = processedContent.replace(citationMark, citationLink);
+    });
+
     // Store the search result in the database
     const { error: insertError } = await supabase
       .from('search_results')
       .insert({
         query,
-        result: data.choices[0].message.content,
+        result: processedContent,
         citations,
         web_source: webSource,
         custom_webs: customWebs
@@ -92,7 +100,7 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        result: data.choices[0].message.content,
+        result: processedContent,
         citations,
         related_questions: data.related_questions || []
       }),

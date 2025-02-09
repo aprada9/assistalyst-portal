@@ -457,9 +457,10 @@ export default function Index() {
                     }`}
                   >
                     <div className="space-y-4">
-                      <div className="prose max-w-none">
-                        {message.content}
-                      </div>
+                      <div 
+                        className="prose max-w-none"
+                        dangerouslySetInnerHTML={{ __html: message.content }}
+                      />
                       
                       {searchResult && message.type === 'assistant' && (
                         <>
