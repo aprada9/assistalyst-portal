@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -21,7 +20,8 @@ export default function Index() {
     summarySize: 'quarter',
     webSource: 'all',
     searchQuery: '',
-    customWebs: ''
+    customWebs: '',
+    file: null
   });
 
   const mainOptions = [
@@ -36,6 +36,12 @@ export default function Index() {
       icon: <Search className="w-5 h-5" />, 
       label: 'Specialized Search', 
       description: 'Search across multiple sources with citations' 
+    },
+    { 
+      id: 'ocr', 
+      icon: <Upload className="w-5 h-5" />, 
+      label: 'Document OCR', 
+      description: 'Extract text from images and PDFs' 
     }
   ];
 
@@ -49,8 +55,16 @@ export default function Index() {
         summarySize: 'quarter',
         webSource: 'all',
         searchQuery: '',
-        customWebs: ''
+        customWebs: '',
+        file: null
       });
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFormData(prev => ({ ...prev, file }));
     }
   };
 
@@ -110,7 +124,7 @@ export default function Index() {
         ]);
 
         toast.success('Summary generated!');
-      } else {
+      } else if (currentStep === 'search') {
         // Placeholder for search functionality
         result = "Search functionality coming soon...";
         
@@ -142,6 +156,55 @@ export default function Index() {
         ]);
 
         toast.success('Search completed!');
+      } else if (currentStep === 'ocr') {
+        if (!formData.file) {
+          throw new Error('Please upload a file');
+        }
+
+        const formDataToSend = new FormData();
+        formDataToSend.append('file', formData.file);
+
+        const { data: ocrData, error: ocrError } = await supabase.functions.invoke(
+          'process-ocr',
+          {
+            body: formDataToSend
+          }
+        );
+
+        if (ocrError) {
+          throw new Error(ocrError.message);
+        }
+
+        result = ocrData.text;
+
+        // Create a new message object
+        const messageData = {
+          content: result,
+          type: 'assistant'
+        };
+
+        // Store the message in Supabase
+        const { error: insertError } = await supabase
+          .from('messages')
+          .insert([messageData]);
+
+        if (insertError) {
+          console.error('Error inserting message:', insertError);
+          throw new Error(insertError.message);
+        }
+
+        // Update local state
+        setMessages(prev => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            type: 'assistant',
+            content: result,
+            timestamp: new Date()
+          }
+        ]);
+
+        toast.success('Text extracted successfully!');
       }
     } catch (error) {
       console.error('Error processing request:', error);
@@ -317,6 +380,44 @@ export default function Index() {
     </div>
   );
 
+  const renderOCRForm = () => (
+    <div className="space-y-6 p-4 animate-in">
+      <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => handleNavigate('initial')}
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </Button>
+        <h2 className="text-lg font-semibold">Document OCR</h2>
+      </div>
+
+      <div className="space-y-4">
+        <div className="grid w-full max-w-sm items-center gap-1.5">
+          <Input
+            type="file"
+            accept="image/*,.pdf"
+            onChange={handleFileChange}
+            className="cursor-pointer"
+          />
+          <p className="text-sm text-muted-foreground">
+            Upload images or PDF files
+          </p>
+        </div>
+
+        <Button 
+          className="w-full"
+          onClick={handleSubmit}
+          disabled={!formData.file}
+        >
+          <Upload className="w-4 h-4 mr-2" />
+          Process Document
+        </Button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       <div className="max-w-3xl mx-auto pt-8 pb-16">
@@ -329,6 +430,7 @@ export default function Index() {
             {currentStep === 'initial' && renderInitialView()}
             {currentStep === 'summary' && renderSummaryForm()}
             {currentStep === 'search' && renderSearchForm()}
+            {currentStep === 'ocr' && renderOCRForm()}
             {currentStep === 'processing' && (
               <div className="p-4 space-y-4">
                 {messages.map((message) => (

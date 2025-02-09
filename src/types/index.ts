@@ -14,6 +14,7 @@ export interface FormData {
   webSource: 'all' | 'boe' | 'borne' | 'custom';
   searchQuery: string;
   customWebs: string;
+  file: File | null;
 }
 
-export type Step = 'initial' | 'summary' | 'search' | 'processing';
+export type Step = 'initial' | 'summary' | 'search' | 'ocr' | 'processing';
