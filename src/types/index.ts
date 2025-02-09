@@ -6,7 +6,7 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
-export interface FormData {
+export interface DocumentFormData {
   documentType: 'url' | 'file' | 'paste';
   pastedText: string;
   summaryType: 'bullets' | 'general';

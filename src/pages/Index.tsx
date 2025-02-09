@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -6,14 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, Search, Upload, Link, Type, ChevronLeft, Sparkles } from 'lucide-react';
-import { ChatMessage, FormData, Step } from '@/types';
+import { ChatMessage, DocumentFormData, Step } from '@/types';
 import { toast } from 'sonner';
 import { supabase } from "@/integrations/supabase/client";
 
 export default function Index() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentStep, setCurrentStep] = useState<Step>('initial');
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<DocumentFormData>({
     documentType: 'paste',
     pastedText: '',
     summaryType: 'general',
