@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -7,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Search, Upload, Link, Type, ChevronLeft, Sparkles } from 'lucide-react';
+import { FileText, Search, Upload, Link, Type, ChevronLeft, Sparkles, Loader2 } from 'lucide-react';
 import { ChatMessage, DocumentFormData, Step } from '@/types';
 import { toast } from 'sonner';
 import { supabase } from "@/integrations/supabase/client";
@@ -82,106 +81,29 @@ export default function Index() {
     related_questions: string[];
   } | null>(null);
 
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchProgress, setSearchProgress] = useState<string[]>([]);
+
   const handleSubmit = async () => {
     try {
       setCurrentStep('processing');
       
-      let result: string;
-      
-      if (currentStep === 'summary') {
-        const { data: processingData, error: processingError } = await supabase.functions.invoke('process-document', {
-          body: {
-            text: formData.pastedText,
-            summaryType: formData.summaryType,
-            summarySize: formData.summarySize
-          }
-        });
-
-        if (processingError) {
-          throw new Error(processingError.message);
-        }
-
-        result = processingData.summary;
-
-        const messageData = {
-          content: result,
-          type: 'assistant',
-          document_type: formData.documentType,
-          summary_type: formData.summaryType,
-          summary_size: formData.summarySize,
-          web_source: formData.webSource,
-          search_query: formData.searchQuery,
-          custom_webs: formData.customWebs
-        };
-
-        const { error: insertError } = await supabase
-          .from('messages')
-          .insert([messageData]);
-
-        if (insertError) {
-          console.error('Error inserting message:', insertError);
-          throw new Error(insertError.message);
-        }
-
-        setMessages(prev => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            type: 'assistant',
-            content: result,
-            timestamp: new Date()
-          }
-        ]);
-
-        toast.success('Summary generated!');
-      } else if (currentStep === 'search') {
-        const { data: searchData, error: searchError } = await supabase.functions.invoke(
-          'process-search',
-          {
-            body: {
-              query: formData.searchQuery,
-              webSource: formData.webSource,
-              customWebs: formData.customWebs
-            }
-          }
-        );
-
-        if (searchError) {
-          throw new Error(searchError.message);
-        }
-
-        setSearchResult(searchData);
-        result = searchData.result;
+      if (currentStep === 'miniplex') {
+        setIsSearching(true);
+        setSearchProgress([]);
         
-        const messageData = {
-          content: result,
-          type: 'assistant',
-          web_source: formData.webSource,
-          search_query: formData.searchQuery,
-          custom_webs: formData.customWebs
-        };
+        const progressSteps = [
+          "Analyzing query...",
+          "Searching web sources...",
+          "Processing information...",
+          "Generating response..."
+        ];
 
-        const { error: insertError } = await supabase
-          .from('messages')
-          .insert([messageData]);
-
-        if (insertError) {
-          console.error('Error inserting message:', insertError);
-          throw new Error(insertError.message);
+        for (const step of progressSteps) {
+          setSearchProgress(prev => [...prev, step]);
+          await new Promise(resolve => setTimeout(resolve, 800)); // Simulate progress
         }
 
-        setMessages(prev => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            type: 'assistant',
-            content: result,
-            timestamp: new Date()
-          }
-        ]);
-
-        toast.success('Search completed!');
-      } else if (currentStep === 'miniplex') {
         const { data: searchData, error: searchError } = await supabase.functions.invoke(
           'process-miniplex',
           {
@@ -198,10 +120,10 @@ export default function Index() {
         }
 
         setSearchResult(searchData);
-        result = searchData.result;
+        setIsSearching(false);
         
         const messageData = {
-          content: result,
+          content: searchData.result,
           type: 'assistant',
           web_source: formData.webSource,
           search_query: formData.searchQuery,
@@ -222,62 +144,160 @@ export default function Index() {
           {
             id: Date.now().toString(),
             type: 'assistant',
-            content: result,
+            content: searchData.result,
             timestamp: new Date()
           }
         ]);
 
         toast.success('MiniPlex search completed!');
-      } else if (currentStep === 'ocr') {
-        if (!formData.file) {
-          throw new Error('Please upload a file');
-        }
+      } else {
+        let result: string;
+        
+        if (currentStep === 'summary') {
+          const { data: processingData, error: processingError } = await supabase.functions.invoke('process-document', {
+            body: {
+              text: formData.pastedText,
+              summaryType: formData.summaryType,
+              summarySize: formData.summarySize
+            }
+          });
 
-        const formDataToSend = new FormData();
-        formDataToSend.append('file', formData.file);
-
-        const { data: ocrData, error: ocrError } = await supabase.functions.invoke(
-          'process-ocr',
-          {
-            body: formDataToSend
+          if (processingError) {
+            throw new Error(processingError.message);
           }
-        );
 
-        if (ocrError) {
-          throw new Error(ocrError.message);
-        }
+          result = processingData.summary;
 
-        result = ocrData.text;
-
-        const messageData = {
-          content: result,
-          type: 'assistant'
-        };
-
-        const { error: insertError } = await supabase
-          .from('messages')
-          .insert([messageData]);
-
-        if (insertError) {
-          console.error('Error inserting message:', insertError);
-          throw new Error(insertError.message);
-        }
-
-        setMessages(prev => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            type: 'assistant',
+          const messageData = {
             content: result,
-            timestamp: new Date()
-          }
-        ]);
+            type: 'assistant',
+            document_type: formData.documentType,
+            summary_type: formData.summaryType,
+            summary_size: formData.summarySize,
+            web_source: formData.webSource,
+            search_query: formData.searchQuery,
+            custom_webs: formData.customWebs
+          };
 
-        toast.success('Text extracted successfully!');
+          const { error: insertError } = await supabase
+            .from('messages')
+            .insert([messageData]);
+
+          if (insertError) {
+            console.error('Error inserting message:', insertError);
+            throw new Error(insertError.message);
+          }
+
+          setMessages(prev => [
+            ...prev,
+            {
+              id: Date.now().toString(),
+              type: 'assistant',
+              content: result,
+              timestamp: new Date()
+            }
+          ]);
+
+          toast.success('Summary generated!');
+        } else if (currentStep === 'search') {
+          const { data: searchData, error: searchError } = await supabase.functions.invoke(
+            'process-search',
+            {
+              body: {
+                query: formData.searchQuery,
+                webSource: formData.webSource,
+                customWebs: formData.customWebs
+              }
+            }
+          );
+
+          if (searchError) {
+            throw new Error(searchError.message);
+          }
+
+          setSearchResult(searchData);
+          result = searchData.result;
+          
+          const messageData = {
+            content: result,
+            type: 'assistant',
+            web_source: formData.webSource,
+            search_query: formData.searchQuery,
+            custom_webs: formData.customWebs
+          };
+
+          const { error: insertError } = await supabase
+            .from('messages')
+            .insert([messageData]);
+
+          if (insertError) {
+            console.error('Error inserting message:', insertError);
+            throw new Error(insertError.message);
+          }
+
+          setMessages(prev => [
+            ...prev,
+            {
+              id: Date.now().toString(),
+              type: 'assistant',
+              content: result,
+              timestamp: new Date()
+            }
+          ]);
+
+          toast.success('Search completed!');
+        } else if (currentStep === 'ocr') {
+          if (!formData.file) {
+            throw new Error('Please upload a file');
+          }
+
+          const formDataToSend = new FormData();
+          formDataToSend.append('file', formData.file);
+
+          const { data: ocrData, error: ocrError } = await supabase.functions.invoke(
+            'process-ocr',
+            {
+              body: formDataToSend
+            }
+          );
+
+          if (ocrError) {
+            throw new Error(ocrError.message);
+          }
+
+          result = ocrData.text;
+
+          const messageData = {
+            content: result,
+            type: 'assistant'
+          };
+
+          const { error: insertError } = await supabase
+            .from('messages')
+            .insert([messageData]);
+
+          if (insertError) {
+            console.error('Error inserting message:', insertError);
+            throw new Error(insertError.message);
+          }
+
+          setMessages(prev => [
+            ...prev,
+            {
+              id: Date.now().toString(),
+              type: 'assistant',
+              content: result,
+              timestamp: new Date()
+            }
+          ]);
+
+          toast.success('Text extracted successfully!');
+        }
       }
     } catch (error) {
       console.error('Error processing request:', error);
       toast.error('An error occurred. Please try again.');
+      setIsSearching(false);
     }
   };
 
@@ -532,8 +552,32 @@ export default function Index() {
         </div>
       </div>
 
-      {currentStep === 'processing' && searchResult && (
-        <div className="mt-8 space-y-6">
+      {isSearching && (
+        <Card className="p-6 mt-8">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-sm font-medium">Searching...</span>
+            </div>
+            <div className="space-y-2">
+              {searchProgress.map((step, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-2 text-sm text-muted-foreground animate-fade-in"
+                >
+                  <Badge variant="secondary" className="h-6">
+                    {index + 1}
+                  </Badge>
+                  {step}
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {currentStep === 'processing' && searchResult && !isSearching && (
+        <div className="mt-8 space-y-6 animate-fade-in">
           <Card className="p-6">
             <div className="prose max-w-none">
               <div dangerouslySetInnerHTML={{ __html: searchResult.result }} />
@@ -545,7 +589,7 @@ export default function Index() {
               <h3 className="text-lg font-semibold mb-4">Web References</h3>
               <div className="space-y-3">
                 {searchResult.citations.map((citation, index) => (
-                  <div key={index} className="flex items-start gap-2">
+                  <div key={index} className="flex items-start gap-2 animate-fade-in" style={{ animationDelay: `${index * 150}ms` }}>
                     <div className="min-w-[24px] h-6 flex items-center justify-center rounded-full bg-primary/10 text-primary text-sm">
                       {index + 1}
                     </div>
@@ -571,7 +615,8 @@ export default function Index() {
                   <Button
                     key={index}
                     variant="ghost"
-                    className="w-full justify-start text-left"
+                    className="w-full justify-start text-left animate-fade-in"
+                    style={{ animationDelay: `${index * 150}ms` }}
                     onClick={() => {
                       setFormData(prev => ({ ...prev, searchQuery: question }));
                       handleSubmit();
