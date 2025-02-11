@@ -492,7 +492,7 @@ export default function Index() {
             className="absolute right-1 top-1 h-8"
             size="sm"
             onClick={handleSubmit}
-            disabled={!formData.searchQuery.trim()}
+            disabled={!formData.searchQuery.trim() || isSearching}
           >
             <Sparkles className="w-4 h-4 mr-2" />
             Search
@@ -550,6 +550,7 @@ export default function Index() {
         </div>
       </div>
 
+      {/* Loading State */}
       {isSearching && (
         <Card className="p-6 mt-8">
           <div className="space-y-4">
@@ -574,61 +575,78 @@ export default function Index() {
         </Card>
       )}
 
-      {currentStep === 'processing' && searchResult && !isSearching && (
-        <div className="mt-8 space-y-6 animate-fade-in">
-          <Card className="p-6">
-            <div className="prose max-w-none">
-              <div dangerouslySetInnerHTML={{ __html: searchResult.result }} />
-            </div>
-          </Card>
-
-          {searchResult.citations.length > 0 && (
-            <Card className="p-6 bg-muted/50">
-              <h3 className="text-lg font-semibold mb-4">Web References</h3>
-              <div className="space-y-3">
-                {searchResult.citations.map((citation, index) => (
-                  <div key={index} className="flex items-start gap-2 animate-fade-in" style={{ animationDelay: `${index * 150}ms` }}>
-                    <div className="min-w-[24px] h-6 flex items-center justify-center rounded-full bg-primary/10 text-primary text-sm">
-                      {index + 1}
+      {/* Chat History and Results */}
+      <ScrollArea className="h-[500px] mt-4">
+        <div className="space-y-4">
+          {chatHistory.map((message, index) => (
+            <Card 
+              key={index}
+              className={`p-4 ${
+                message.type === 'user' 
+                  ? 'bg-primary/10' 
+                  : 'bg-background'
+              }`}
+            >
+              <div className="flex items-start gap-2">
+                <Badge 
+                  variant={message.type === 'user' ? 'default' : 'secondary'}
+                  className="mt-1"
+                >
+                  {message.type === 'user' ? 'You' : 'AI'}
+                </Badge>
+                <div className="flex-1">
+                  <div 
+                    className="prose max-w-none"
+                    dangerouslySetInnerHTML={{ __html: message.content }}
+                  />
+                  
+                  {message.type === 'assistant' && message.citations && (
+                    <div className="mt-4 pt-4 border-t border-border">
+                      <div className="text-sm font-medium mb-2">Sources:</div>
+                      <div className="space-y-1">
+                        {message.citations.map((citation, idx) => (
+                          <a
+                            key={idx}
+                            href={citation.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-primary hover:underline block"
+                          >
+                            {citation.title}
+                          </a>
+                        ))}
+                      </div>
                     </div>
-                    <a
-                      href={citation.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline flex-1 text-sm"
-                    >
-                      {citation.url}
-                    </a>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
+                  )}
 
-          {searchResult.related_questions.length > 0 && (
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Related Questions</h3>
-              <div className="space-y-2">
-                {searchResult.related_questions.map((question, index) => (
-                  <Button
-                    key={index}
-                    variant="ghost"
-                    className="w-full justify-start text-left animate-fade-in"
-                    style={{ animationDelay: `${index * 150}ms` }}
-                    onClick={() => {
-                      setFormData(prev => ({ ...prev, searchQuery: question }));
-                      handleSubmit();
-                    }}
-                  >
-                    <Search className="w-4 h-4 mr-2" />
-                    {question}
-                  </Button>
-                ))}
+                  {message.type === 'assistant' && message.related_questions && (
+                    <div className="mt-4 space-y-2">
+                      <div className="text-sm font-medium">Related Questions:</div>
+                      <div className="space-y-2">
+                        {message.related_questions.map((question, idx) => (
+                          <Button
+                            key={idx}
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start text-left"
+                            onClick={() => {
+                              setFormData(prev => ({ ...prev, searchQuery: question }));
+                              handleSubmit();
+                            }}
+                          >
+                            <Search className="w-4 h-4 mr-2" />
+                            {question}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </Card>
-          )}
+          ))}
         </div>
-      )}
+      </ScrollArea>
     </div>
   );
 
