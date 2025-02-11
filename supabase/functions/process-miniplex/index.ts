@@ -12,6 +12,7 @@ interface SearchRequest {
   query: string;
   webSource: string;
   customWebs?: string;
+  previousContext?: string;
 }
 
 serve(async (req) => {
@@ -20,16 +21,14 @@ serve(async (req) => {
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { query, webSource, customWebs } = await req.json() as SearchRequest;
-    console.log('Processing MiniPlex search request:', { query, webSource, customWebs });
+    const { query, webSource, customWebs, previousContext } = await req.json() as SearchRequest;
+    console.log('Processing MiniPlex search request:', { query, webSource, customWebs, previousContext });
 
-    // Prepare search parameters based on webSource
     let searchDomainFilter: string[] = [];
     if (webSource === 'boe') {
       searchDomainFilter = ['boe.es'];
@@ -39,7 +38,16 @@ serve(async (req) => {
       searchDomainFilter = customWebs.split(',').map(domain => domain.trim());
     }
 
-    // OpenAI API call with custom system prompt for Scira-like behavior
+    const systemPrompt = `You are a helpful AI search assistant. When responding:
+      1. Always cite sources using [number] format
+      2. Keep responses clear and concise
+      3. Use search results to provide accurate, current information
+      4. List all citations at the end with full URLs
+      5. Suggest 3 related questions that might interest the user
+      
+      Previous conversation context (if any):
+      ${previousContext || 'No previous context'}`;
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -51,12 +59,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a helpful AI search assistant. When responding:
-              1. Always cite sources using [number] format
-              2. Keep responses clear and concise
-              3. Use search results to provide accurate, current information
-              4. List all citations at the end with full URLs
-              5. Suggest 3 related questions that might interest the user`
+            content: systemPrompt
           },
           {
             role: 'user',
@@ -71,10 +74,9 @@ serve(async (req) => {
     const data = await response.json();
     console.log('OpenAI API response:', data);
 
-    // Extract the main response
     const content = data.choices[0].message.content;
 
-    // Parse citations and related questions
+    // Extract citations and related questions
     const citations: Array<{ title: string; url: string }> = [];
     const relatedQuestions: string[] = [];
     
@@ -94,7 +96,7 @@ serve(async (req) => {
       }
     }
 
-    // Extract related questions (assuming they're at the end of the response)
+    // Extract related questions
     const questionLines = content.split('\n').filter(line => 
       line.trim().match(/^\d+\.\s+.+\?$/));
     questionLines.slice(0, 3).forEach(line => {
@@ -146,4 +148,3 @@ serve(async (req) => {
     );
   }
 });
-

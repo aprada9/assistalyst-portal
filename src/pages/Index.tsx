@@ -52,6 +52,13 @@ export default function Index() {
     }
   ];
 
+  const [chatHistory, setChatHistory] = useState<Array<{
+    type: 'user' | 'assistant';
+    content: string;
+    citations?: Array<{ title: string; url: string }>;
+    related_questions?: string[];
+  }>>([]);
+
   const handleNavigate = (step: Step) => {
     setCurrentStep(step);
     if (step === 'initial') {
@@ -101,8 +108,12 @@ export default function Index() {
 
         for (const step of progressSteps) {
           setSearchProgress(prev => [...prev, step]);
-          await new Promise(resolve => setTimeout(resolve, 800)); // Simulate progress
+          await new Promise(resolve => setTimeout(resolve, 800));
         }
+
+        const previousContext = chatHistory
+          .map(msg => `${msg.type}: ${msg.content}`)
+          .join('\n');
 
         const { data: searchData, error: searchError } = await supabase.functions.invoke(
           'process-miniplex',
@@ -110,7 +121,8 @@ export default function Index() {
             body: {
               query: formData.searchQuery,
               webSource: formData.webSource,
-              customWebs: formData.customWebs
+              customWebs: formData.customWebs,
+              previousContext
             }
           }
         );
@@ -121,35 +133,21 @@ export default function Index() {
 
         setSearchResult(searchData);
         setIsSearching(false);
-        
-        const messageData = {
-          content: searchData.result,
-          type: 'assistant',
-          web_source: formData.webSource,
-          search_query: formData.searchQuery,
-          custom_webs: formData.customWebs
-        };
 
-        const { error: insertError } = await supabase
-          .from('messages')
-          .insert([messageData]);
-
-        if (insertError) {
-          console.error('Error inserting message:', insertError);
-          throw new Error(insertError.message);
-        }
-
-        setMessages(prev => [
+        setChatHistory(prev => [
           ...prev,
-          {
-            id: Date.now().toString(),
-            type: 'assistant',
+          { type: 'user', content: formData.searchQuery },
+          { 
+            type: 'assistant', 
             content: searchData.result,
-            timestamp: new Date()
+            citations: searchData.citations,
+            related_questions: searchData.related_questions
           }
         ]);
 
-        toast.success('MiniPlex search completed!');
+        setFormData(prev => ({ ...prev, searchQuery: '' }));
+
+        toast.success('Response generated!');
       } else {
         let result: string;
         
