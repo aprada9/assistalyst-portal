@@ -1,17 +1,16 @@
+
 import { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Search, Upload, Link, Type, ChevronLeft, Sparkles } from 'lucide-react';
 import { ChatMessage, DocumentFormData, Step } from '@/types';
 import { toast } from 'sonner';
 import { supabase } from "@/integrations/supabase/client";
-import { SearchProgress } from "@/components/ui/search-progress";
-import { SearchResult } from "@/components/ui/search-result";
-import { Textarea } from "@/components/ui/textarea";
 
 export default function Index() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -26,14 +25,6 @@ export default function Index() {
     customWebs: '',
     file: null
   });
-
-  const [searchResult, setSearchResult] = useState<{
-    result: string;
-    citations: Array<{ title: string; url: string }>;
-    related_questions: string[];
-  } | null>(null);
-  
-  const [isSearching, setIsSearching] = useState(false);
 
   const mainOptions = [
     { 
@@ -85,16 +76,67 @@ export default function Index() {
     }
   };
 
+  const [searchResult, setSearchResult] = useState<{
+    result: string;
+    citations: Array<{ title: string; url: string }>;
+    related_questions: string[];
+  } | null>(null);
+
   const handleSubmit = async () => {
     try {
       setCurrentStep('processing');
       
-      if (currentStep === 'miniplex') {
-        setIsSearching(true);
-        setSearchResult(null);
+      let result: string;
+      
+      if (currentStep === 'summary') {
+        const { data: processingData, error: processingError } = await supabase.functions.invoke('process-document', {
+          body: {
+            text: formData.pastedText,
+            summaryType: formData.summaryType,
+            summarySize: formData.summarySize
+          }
+        });
 
+        if (processingError) {
+          throw new Error(processingError.message);
+        }
+
+        result = processingData.summary;
+
+        const messageData = {
+          content: result,
+          type: 'assistant',
+          document_type: formData.documentType,
+          summary_type: formData.summaryType,
+          summary_size: formData.summarySize,
+          web_source: formData.webSource,
+          search_query: formData.searchQuery,
+          custom_webs: formData.customWebs
+        };
+
+        const { error: insertError } = await supabase
+          .from('messages')
+          .insert([messageData]);
+
+        if (insertError) {
+          console.error('Error inserting message:', insertError);
+          throw new Error(insertError.message);
+        }
+
+        setMessages(prev => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            type: 'assistant',
+            content: result,
+            timestamp: new Date()
+          }
+        ]);
+
+        toast.success('Summary generated!');
+      } else if (currentStep === 'search') {
         const { data: searchData, error: searchError } = await supabase.functions.invoke(
-          'process-miniplex',
+          'process-search',
           {
             body: {
               query: formData.searchQuery,
@@ -108,14 +150,11 @@ export default function Index() {
           throw new Error(searchError.message);
         }
 
-        // Simulate some delay to show the progress
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
         setSearchResult(searchData);
-        setIsSearching(false);
+        result = searchData.result;
         
         const messageData = {
-          content: searchData.result,
+          content: result,
           type: 'assistant',
           web_source: formData.webSource,
           search_query: formData.searchQuery,
@@ -136,160 +175,109 @@ export default function Index() {
           {
             id: Date.now().toString(),
             type: 'assistant',
-            content: searchData.result,
+            content: result,
             timestamp: new Date()
           }
         ]);
 
         toast.success('Search completed!');
-      } else {
-        let result: string;
-        
-        if (currentStep === 'summary') {
-          const { data: processingData, error: processingError } = await supabase.functions.invoke('process-document', {
+      } else if (currentStep === 'miniplex') {
+        const { data: searchData, error: searchError } = await supabase.functions.invoke(
+          'process-miniplex',
+          {
             body: {
-              text: formData.pastedText,
-              summaryType: formData.summaryType,
-              summarySize: formData.summarySize
+              query: formData.searchQuery,
+              webSource: formData.webSource,
+              customWebs: formData.customWebs
             }
-          });
-
-          if (processingError) {
-            throw new Error(processingError.message);
           }
+        );
 
-          result = processingData.summary;
-
-          const messageData = {
-            content: result,
-            type: 'assistant',
-            document_type: formData.documentType,
-            summary_type: formData.summaryType,
-            summary_size: formData.summarySize,
-            web_source: formData.webSource,
-            search_query: formData.searchQuery,
-            custom_webs: formData.customWebs
-          };
-
-          const { error: insertError } = await supabase
-            .from('messages')
-            .insert([messageData]);
-
-          if (insertError) {
-            console.error('Error inserting message:', insertError);
-            throw new Error(insertError.message);
-          }
-
-          setMessages(prev => [
-            ...prev,
-            {
-              id: Date.now().toString(),
-              type: 'assistant',
-              content: result,
-              timestamp: new Date()
-            }
-          ]);
-
-          toast.success('Summary generated!');
-        } else if (currentStep === 'search') {
-          const { data: searchData, error: searchError } = await supabase.functions.invoke(
-            'process-search',
-            {
-              body: {
-                query: formData.searchQuery,
-                webSource: formData.webSource,
-                customWebs: formData.customWebs
-              }
-            }
-          );
-
-          if (searchError) {
-            throw new Error(searchError.message);
-          }
-
-          setSearchResult(searchData);
-          result = searchData.result;
-          
-          const messageData = {
-            content: result,
-            type: 'assistant',
-            web_source: formData.webSource,
-            search_query: formData.searchQuery,
-            custom_webs: formData.customWebs
-          };
-
-          const { error: insertError } = await supabase
-            .from('messages')
-            .insert([messageData]);
-
-          if (insertError) {
-            console.error('Error inserting message:', insertError);
-            throw new Error(insertError.message);
-          }
-
-          setMessages(prev => [
-            ...prev,
-            {
-              id: Date.now().toString(),
-              type: 'assistant',
-              content: result,
-              timestamp: new Date()
-            }
-          ]);
-
-          toast.success('Search completed!');
-        } else if (currentStep === 'ocr') {
-          if (!formData.file) {
-            throw new Error('Please upload a file');
-          }
-
-          const formDataToSend = new FormData();
-          formDataToSend.append('file', formData.file);
-
-          const { data: ocrData, error: ocrError } = await supabase.functions.invoke(
-            'process-ocr',
-            {
-              body: formDataToSend
-            }
-          );
-
-          if (ocrError) {
-            throw new Error(ocrError.message);
-          }
-
-          result = ocrData.text;
-
-          const messageData = {
-            content: result,
-            type: 'assistant'
-          };
-
-          const { error: insertError } = await supabase
-            .from('messages')
-            .insert([messageData]);
-
-          if (insertError) {
-            console.error('Error inserting message:', insertError);
-            throw new Error(insertError.message);
-          }
-
-          setMessages(prev => [
-            ...prev,
-            {
-              id: Date.now().toString(),
-              type: 'assistant',
-              content: result,
-              timestamp: new Date()
-            }
-          ]);
-
-          toast.success('Text extracted successfully!');
+        if (searchError) {
+          throw new Error(searchError.message);
         }
+
+        setSearchResult(searchData);
+        result = searchData.result;
+        
+        const messageData = {
+          content: result,
+          type: 'assistant',
+          web_source: formData.webSource,
+          search_query: formData.searchQuery,
+          custom_webs: formData.customWebs
+        };
+
+        const { error: insertError } = await supabase
+          .from('messages')
+          .insert([messageData]);
+
+        if (insertError) {
+          console.error('Error inserting message:', insertError);
+          throw new Error(insertError.message);
+        }
+
+        setMessages(prev => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            type: 'assistant',
+            content: result,
+            timestamp: new Date()
+          }
+        ]);
+
+        toast.success('MiniPlex search completed!');
+      } else if (currentStep === 'ocr') {
+        if (!formData.file) {
+          throw new Error('Please upload a file');
+        }
+
+        const formDataToSend = new FormData();
+        formDataToSend.append('file', formData.file);
+
+        const { data: ocrData, error: ocrError } = await supabase.functions.invoke(
+          'process-ocr',
+          {
+            body: formDataToSend
+          }
+        );
+
+        if (ocrError) {
+          throw new Error(ocrError.message);
+        }
+
+        result = ocrData.text;
+
+        const messageData = {
+          content: result,
+          type: 'assistant'
+        };
+
+        const { error: insertError } = await supabase
+          .from('messages')
+          .insert([messageData]);
+
+        if (insertError) {
+          console.error('Error inserting message:', insertError);
+          throw new Error(insertError.message);
+        }
+
+        setMessages(prev => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            type: 'assistant',
+            content: result,
+            timestamp: new Date()
+          }
+        ]);
+
+        toast.success('Text extracted successfully!');
       }
     } catch (error) {
       console.error('Error processing request:', error);
       toast.error('An error occurred. Please try again.');
-      setIsSearching(false);
     }
   };
 
@@ -486,7 +474,7 @@ export default function Index() {
             className="absolute right-1 top-1 h-8"
             size="sm"
             onClick={handleSubmit}
-            disabled={!formData.searchQuery.trim() || isSearching}
+            disabled={!formData.searchQuery.trim()}
           >
             <Sparkles className="w-4 h-4 mr-2" />
             Search
@@ -522,22 +510,82 @@ export default function Index() {
               </p>
             </div>
           )}
+
+          <div className="flex flex-wrap gap-2 mt-2">
+            {formData.webSource === 'boe' && (
+              <Badge variant="secondary">BOE.es</Badge>
+            )}
+            {formData.webSource === 'borne' && (
+              <Badge variant="secondary">BORNE.gov.uk</Badge>
+            )}
+            {formData.webSource === 'custom' && formData.customWebs && (
+              formData.customWebs.split(',').map((domain, index) => (
+                <Badge key={index} variant="secondary">
+                  {domain.trim()}
+                </Badge>
+              ))
+            )}
+            {formData.webSource === 'all' && (
+              <Badge variant="secondary">All Available Sources</Badge>
+            )}
+          </div>
         </div>
-
-        <SearchProgress isSearching={isSearching} />
-
-        {searchResult && !isSearching && (
-          <SearchResult
-            content={searchResult.result}
-            citations={searchResult.citations}
-            relatedQuestions={searchResult.related_questions}
-            onRelatedQuestionClick={(question) => {
-              setFormData(prev => ({ ...prev, searchQuery: question }));
-              handleSubmit();
-            }}
-          />
-        )}
       </div>
+
+      {currentStep === 'processing' && searchResult && (
+        <div className="mt-8 space-y-6">
+          <Card className="p-6">
+            <div className="prose max-w-none">
+              <div dangerouslySetInnerHTML={{ __html: searchResult.result }} />
+            </div>
+          </Card>
+
+          {searchResult.citations.length > 0 && (
+            <Card className="p-6 bg-muted/50">
+              <h3 className="text-lg font-semibold mb-4">Web References</h3>
+              <div className="space-y-3">
+                {searchResult.citations.map((citation, index) => (
+                  <div key={index} className="flex items-start gap-2">
+                    <div className="min-w-[24px] h-6 flex items-center justify-center rounded-full bg-primary/10 text-primary text-sm">
+                      {index + 1}
+                    </div>
+                    <a
+                      href={citation.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline flex-1 text-sm"
+                    >
+                      {citation.url}
+                    </a>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {searchResult.related_questions.length > 0 && (
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold mb-4">Related Questions</h3>
+              <div className="space-y-2">
+                {searchResult.related_questions.map((question, index) => (
+                  <Button
+                    key={index}
+                    variant="ghost"
+                    className="w-full justify-start text-left"
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, searchQuery: question }));
+                      handleSubmit();
+                    }}
+                  >
+                    <Search className="w-4 h-4 mr-2" />
+                    {question}
+                  </Button>
+                ))}
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
     </div>
   );
 
@@ -593,6 +641,73 @@ export default function Index() {
             {currentStep === 'search' && renderSearchForm()}
             {currentStep === 'miniplex' && renderMiniPlexForm()}
             {currentStep === 'ocr' && renderOCRForm()}
+            {currentStep === 'processing' && (
+              <div className="p-4 space-y-4">
+                {messages.map((message) => (
+                  <Card 
+                    key={message.id}
+                    className={`p-4 ${
+                      message.type === 'assistant' 
+                        ? 'bg-primary/5 border-primary/10' 
+                        : 'bg-secondary/5 border-secondary/10'
+                    }`}
+                  >
+                    <div className="space-y-4">
+                      <div 
+                        className="prose max-w-none"
+                        dangerouslySetInnerHTML={{ __html: message.content }}
+                      />
+                      
+                      {searchResult && message.type === 'assistant' && (
+                        <>
+                          {searchResult.citations.length > 0 && (
+                            <div className="mt-4 border-t pt-4">
+                              <h4 className="font-semibold mb-2">Citations</h4>
+                              <ul className="space-y-2">
+                                {searchResult.citations.map((citation, index) => (
+                                  <li key={index}>
+                                    <a 
+                                      href={citation.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-primary hover:underline flex items-center gap-2"
+                                    >
+                                      <Link className="w-4 h-4" />
+                                      {citation.title}
+                                    </a>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {searchResult.related_questions.length > 0 && (
+                            <div className="mt-4 border-t pt-4">
+                              <h4 className="font-semibold mb-2">Related Questions</h4>
+                              <ul className="space-y-2">
+                                {searchResult.related_questions.map((question, index) => (
+                                  <li 
+                                    key={index}
+                                    className="text-primary hover:bg-primary/5 p-2 rounded-md cursor-pointer flex items-center gap-2"
+                                    onClick={() => {
+                                      setFormData(prev => ({ ...prev, searchQuery: question }));
+                                      handleSubmit();
+                                    }}
+                                  >
+                                    <Search className="w-4 h-4" />
+                                    {question}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
           </ScrollArea>
         </Card>
       </div>
