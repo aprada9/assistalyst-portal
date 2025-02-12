@@ -24,6 +24,8 @@ export default function Index() {
     customWebs: '',
     file: null
   });
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const mainOptions = [
     { 
@@ -69,6 +71,7 @@ export default function Index() {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setError(null); // Clear any previous errors
     const file = e.target.files?.[0];
     if (file) {
       setFormData(prev => ({ ...prev, file }));
@@ -83,9 +86,9 @@ export default function Index() {
 
   const handleSubmit = async () => {
     try {
+      setError(null);
+      setIsProcessing(true);
       setCurrentStep('processing');
-      
-      let result: string;
       
       if (currentStep === 'summary') {
         const { data: processingData, error: processingError } = await supabase.functions.invoke('process-document', {
@@ -100,7 +103,7 @@ export default function Index() {
           throw new Error(processingError.message);
         }
 
-        result = processingData.summary;
+        const result = processingData.summary;
 
         const messageData = {
           content: result,
@@ -150,7 +153,7 @@ export default function Index() {
         }
 
         setSearchResult(searchData);
-        result = searchData.result;
+        const result = searchData.result;
         
         const messageData = {
           content: result,
@@ -197,7 +200,7 @@ export default function Index() {
         }
 
         setSearchResult(searchData);
-        result = searchData.result;
+        const result = searchData.result;
         
         const messageData = {
           content: result,
@@ -246,7 +249,7 @@ export default function Index() {
           throw new Error(ocrError.message);
         }
 
-        result = ocrData.text;
+        const result = ocrData.text;
 
         const messageData = {
           content: result,
@@ -276,7 +279,13 @@ export default function Index() {
       }
     } catch (error) {
       console.error('Error processing request:', error);
+      setError(error.message || 'An error occurred while processing the document');
+      if (currentStep === 'ocr') {
+        setCurrentStep('ocr');
+      }
       toast.error('An error occurred. Please try again.');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -589,77 +598,6 @@ export default function Index() {
   );
 
   const renderOCRForm = () => {
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      setError(null); // Clear any previous errors
-      const file = e.target.files?.[0];
-      if (file) {
-        setFormData(prev => ({ ...prev, file }));
-      }
-    };
-
-    const handleSubmit = async () => {
-      try {
-        setError(null);
-        setIsProcessing(true);
-        setCurrentStep('processing');
-        
-        if (!formData.file) {
-          throw new Error('Please upload a file');
-        }
-
-        const formDataToSend = new FormData();
-        formDataToSend.append('file', formData.file);
-
-        const { data: ocrData, error: ocrError } = await supabase.functions.invoke(
-          'process-ocr',
-          {
-            body: formDataToSend
-          }
-        );
-
-        if (ocrError) {
-          throw new Error(ocrError.message);
-        }
-
-        const result = ocrData.text;
-
-        const messageData = {
-          content: result,
-          type: 'assistant'
-        };
-
-        const { error: insertError } = await supabase
-          .from('messages')
-          .insert([messageData]);
-
-        if (insertError) {
-          console.error('Error inserting message:', insertError);
-          throw new Error(insertError.message);
-        }
-
-        setMessages(prev => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            type: 'assistant',
-            content: result,
-            timestamp: new Date()
-          }
-        ]);
-
-        toast.success('Text extracted successfully!');
-      } catch (error) {
-        console.error('Error processing request:', error);
-        setError(error.message || 'An error occurred while processing the document');
-        setCurrentStep('ocr'); // Return to OCR form on error
-      } finally {
-        setIsProcessing(false);
-      }
-    };
-
     return (
       <div className="space-y-6 p-4 animate-in">
         <div className="flex items-center gap-2">
