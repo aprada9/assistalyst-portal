@@ -20,6 +20,8 @@ serve(async (req) => {
       throw new Error('No file uploaded')
     }
 
+    console.log('File received:', file.name, 'Type:', file.type);
+
     // Create Supabase client
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -33,6 +35,7 @@ serve(async (req) => {
       .upload(fileName, file)
 
     if (uploadError) {
+      console.error('Upload error:', uploadError);
       throw new Error(`Upload error: ${uploadError.message}`)
     }
 
@@ -40,6 +43,8 @@ serve(async (req) => {
     const { data: { publicUrl } } = supabase.storage
       .from('documents')
       .getPublicUrl(fileName)
+
+    console.log('File uploaded, public URL:', publicUrl);
 
     // Process with OpenAI
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -49,7 +54,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "gpt-4-vision-preview",
         messages: [
           {
             role: "system",
@@ -60,7 +65,9 @@ serve(async (req) => {
             content: [
               {
                 "type": "image_url",
-                "image_url": publicUrl
+                "image_url": {
+                  "url": publicUrl
+                }
               },
               "Please extract all the text from this document and format it nicely."
             ]
@@ -73,14 +80,22 @@ serve(async (req) => {
     if (!response.ok) {
       const error = await response.json()
       console.error('OpenAI API error:', error)
-      throw new Error('Failed to process document')
+      throw new Error(`Failed to process document: ${error.error?.message || 'Unknown error'}`)
     }
 
     const data = await response.json()
+    console.log('OpenAI API response received');
+    
     const extractedText = data.choices[0]?.message?.content || 'No text could be extracted'
 
     // Delete the uploaded file after processing
-    await supabase.storage.from('documents').remove([fileName])
+    const { error: deleteError } = await supabase.storage
+      .from('documents')
+      .remove([fileName])
+
+    if (deleteError) {
+      console.error('Error deleting file:', deleteError);
+    }
 
     return new Response(
       JSON.stringify({ text: extractedText }),
