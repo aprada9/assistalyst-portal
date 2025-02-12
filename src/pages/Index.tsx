@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -589,41 +588,171 @@ export default function Index() {
     </div>
   );
 
-  const renderOCRForm = () => (
-    <div className="space-y-6 p-4 animate-in">
-      <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => handleNavigate('initial')}
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </Button>
-        <h2 className="text-lg font-semibold">Document OCR</h2>
-      </div>
+  const renderOCRForm = () => {
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-      <div className="space-y-4">
-        <div className="grid w-full max-w-sm items-center gap-1.5">
-          <Input
-            type="file"
-            accept="image/*,.pdf"
-            onChange={handleFileChange}
-            className="cursor-pointer"
-          />
-          <p className="text-sm text-muted-foreground">
-            Upload images or PDF files
-          </p>
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setError(null); // Clear any previous errors
+      const file = e.target.files?.[0];
+      if (file) {
+        setFormData(prev => ({ ...prev, file }));
+      }
+    };
+
+    const handleSubmit = async () => {
+      try {
+        setError(null);
+        setIsProcessing(true);
+        setCurrentStep('processing');
+        
+        if (!formData.file) {
+          throw new Error('Please upload a file');
+        }
+
+        const formDataToSend = new FormData();
+        formDataToSend.append('file', formData.file);
+
+        const { data: ocrData, error: ocrError } = await supabase.functions.invoke(
+          'process-ocr',
+          {
+            body: formDataToSend
+          }
+        );
+
+        if (ocrError) {
+          throw new Error(ocrError.message);
+        }
+
+        const result = ocrData.text;
+
+        const messageData = {
+          content: result,
+          type: 'assistant'
+        };
+
+        const { error: insertError } = await supabase
+          .from('messages')
+          .insert([messageData]);
+
+        if (insertError) {
+          console.error('Error inserting message:', insertError);
+          throw new Error(insertError.message);
+        }
+
+        setMessages(prev => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            type: 'assistant',
+            content: result,
+            timestamp: new Date()
+          }
+        ]);
+
+        toast.success('Text extracted successfully!');
+      } catch (error) {
+        console.error('Error processing request:', error);
+        setError(error.message || 'An error occurred while processing the document');
+        setCurrentStep('ocr'); // Return to OCR form on error
+      } finally {
+        setIsProcessing(false);
+      }
+    };
+
+    return (
+      <div className="space-y-6 p-4 animate-in">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => handleNavigate('initial')}
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          <h2 className="text-lg font-semibold">Document OCR</h2>
         </div>
 
-        <Button 
-          className="w-full"
-          onClick={handleSubmit}
-          disabled={!formData.file}
-        >
-          <Upload className="w-4 h-4 mr-2" />
-          Process Document
-        </Button>
+        <div className="space-y-4">
+          <div className="grid w-full max-w-sm items-center gap-1.5">
+            <Input
+              type="file"
+              accept="image/*,.pdf"
+              onChange={handleFileChange}
+              className="cursor-pointer"
+            />
+            <p className="text-sm text-muted-foreground">
+              Upload images (PNG, JPEG, GIF, WebP)
+            </p>
+          </div>
+
+          {error && (
+            <Card className="p-4 border-destructive/50 bg-destructive/5">
+              <div className="flex gap-2 items-start text-destructive">
+                <div className="h-5 w-5 shrink-0 mt-0.5">⚠️</div>
+                <div>
+                  <p className="font-medium">Error</p>
+                  <p className="text-sm text-destructive/90">{error}</p>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          <Button 
+            className="w-full"
+            onClick={handleSubmit}
+            disabled={!formData.file || isProcessing}
+          >
+            {isProcessing ? (
+              <>
+                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-primary border-r-transparent" />
+                Processing Document...
+              </>
+            ) : (
+              <>
+                <Upload className="w-4 h-4 mr-2" />
+                Process Document
+              </>
+            )}
+          </Button>
+        </div>
       </div>
+    );
+  };
+
+  const renderProcessingView = () => (
+    <div className="p-4 space-y-4">
+      {messages.length === 0 && (
+        <Card className="p-6 text-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-r-transparent" />
+            <div>
+              <h3 className="font-semibold">Processing Your Document</h3>
+              <p className="text-sm text-muted-foreground">
+                Please wait while we extract the text...
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+      
+      {messages.map((message) => (
+        <Card 
+          key={message.id}
+          className={`p-4 ${
+            message.type === 'assistant' 
+              ? 'bg-primary/5 border-primary/10' 
+              : 'bg-secondary/5 border-secondary/10'
+          }`}
+        >
+          <div className="space-y-4">
+            <div 
+              className="prose max-w-none"
+              dangerouslySetInnerHTML={{ __html: message.content }}
+            />
+          </div>
+        </Card>
+      ))}
     </div>
   );
 
@@ -641,73 +770,7 @@ export default function Index() {
             {currentStep === 'search' && renderSearchForm()}
             {currentStep === 'miniplex' && renderMiniPlexForm()}
             {currentStep === 'ocr' && renderOCRForm()}
-            {currentStep === 'processing' && (
-              <div className="p-4 space-y-4">
-                {messages.map((message) => (
-                  <Card 
-                    key={message.id}
-                    className={`p-4 ${
-                      message.type === 'assistant' 
-                        ? 'bg-primary/5 border-primary/10' 
-                        : 'bg-secondary/5 border-secondary/10'
-                    }`}
-                  >
-                    <div className="space-y-4">
-                      <div 
-                        className="prose max-w-none"
-                        dangerouslySetInnerHTML={{ __html: message.content }}
-                      />
-                      
-                      {searchResult && message.type === 'assistant' && (
-                        <>
-                          {searchResult.citations.length > 0 && (
-                            <div className="mt-4 border-t pt-4">
-                              <h4 className="font-semibold mb-2">Citations</h4>
-                              <ul className="space-y-2">
-                                {searchResult.citations.map((citation, index) => (
-                                  <li key={index}>
-                                    <a 
-                                      href={citation.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-primary hover:underline flex items-center gap-2"
-                                    >
-                                      <Link className="w-4 h-4" />
-                                      {citation.title}
-                                    </a>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-
-                          {searchResult.related_questions.length > 0 && (
-                            <div className="mt-4 border-t pt-4">
-                              <h4 className="font-semibold mb-2">Related Questions</h4>
-                              <ul className="space-y-2">
-                                {searchResult.related_questions.map((question, index) => (
-                                  <li 
-                                    key={index}
-                                    className="text-primary hover:bg-primary/5 p-2 rounded-md cursor-pointer flex items-center gap-2"
-                                    onClick={() => {
-                                      setFormData(prev => ({ ...prev, searchQuery: question }));
-                                      handleSubmit();
-                                    }}
-                                  >
-                                    <Search className="w-4 h-4" />
-                                    {question}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            )}
+            {currentStep === 'processing' && renderProcessingView()}
           </ScrollArea>
         </Card>
       </div>
