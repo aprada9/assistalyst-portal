@@ -7,6 +7,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const SUPPORTED_FORMATS = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -21,6 +23,11 @@ serve(async (req) => {
     }
 
     console.log('File received:', file.name, 'Type:', file.type);
+
+    // Validate file type
+    if (!SUPPORTED_FORMATS.includes(file.type)) {
+      throw new Error('Unsupported file format. Please upload a PNG, JPEG, GIF, or WebP image.')
+    }
 
     // Create Supabase client
     const supabase = createClient(
