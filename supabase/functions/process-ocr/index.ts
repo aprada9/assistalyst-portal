@@ -61,11 +61,24 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model: "gpt-4-vision-preview",
         messages: [
           {
             role: "system",
-            content: "You are a helpful assistant that extracts text from documents. Extract and return all the text you can see in the image/document."
+            content: `You are a document analysis assistant that extracts and formats text from images.
+            Your task is to:
+            1. Extract all text from the image
+            2. Preserve the original document structure and formatting
+            3. Use HTML tags to maintain layout and styling:
+               - Use <h1>, <h2>, etc. for titles and headings
+               - Use <p> for paragraphs
+               - Use <ul> and <li> for lists
+               - Use <table>, <tr>, <td> for tabular data
+               - Use <br> for line breaks
+               - Use <strong> for bold text
+               - Use <em> for emphasized text
+            4. If you detect specific document types (forms, invoices, etc.), structure the content accordingly
+            5. Maintain the visual hierarchy of the original document`
           },
           {
             role: "user",
@@ -76,7 +89,7 @@ serve(async (req) => {
                   "url": publicUrl
                 }
               },
-              "Please extract all the text from this document and format it nicely."
+              "Please extract and format the text from this document, preserving its structure and layout. Use appropriate HTML tags to maintain the formatting."
             ]
           }
         ],
