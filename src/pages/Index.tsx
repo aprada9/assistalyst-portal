@@ -65,6 +65,7 @@ export default function Index() {
       setError(null);
       setIsProcessing(true);
       setCurrentStep('processing');
+      setMessages([]);
       
       if (currentStep === 'summary') {
         const { data: processingData, error: processingError } = await supabase.functions.invoke('process-document', {
