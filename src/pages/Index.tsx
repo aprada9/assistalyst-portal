@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -226,10 +225,12 @@ export default function Index() {
           throw new Error(ocrError.message);
         }
 
-        const result = ocrData.text;
+        const cleanResult = ocrData.text
+          .replace(/^```html\s*/, '')  // Remove opening ```html and any whitespace
+          .replace(/\s*```$/, '');     // Remove closing ``` and any whitespace
 
         const messageData = {
-          content: result,
+          content: cleanResult,
           type: 'assistant'
         };
 
@@ -247,7 +248,7 @@ export default function Index() {
           {
             id: Date.now().toString(),
             type: 'assistant',
-            content: result,
+            content: cleanResult,
             timestamp: new Date()
           }
         ]);

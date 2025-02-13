@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
@@ -61,7 +60,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model: "gpt-4-vision-preview",
         messages: [
           {
             role: "system",
@@ -78,7 +77,8 @@ serve(async (req) => {
                - Use <strong> for bold text
                - Use <em> for emphasized text
             4. If you detect specific document types (forms, invoices, etc.), structure the content accordingly
-            5. Maintain the visual hierarchy of the original document`
+            5. Maintain the visual hierarchy of the original document
+            6. Return ONLY the formatted HTML without any markdown code fence markers or explanations`
           },
           {
             role: "user",
@@ -100,13 +100,13 @@ serve(async (req) => {
     if (!response.ok) {
       const error = await response.json()
       console.error('OpenAI API error:', error)
-      throw new Error(`Failed to process document: ${error.error?.message || 'Unknown error'}`)
+      throw new Error('Failed to process image')
     }
 
     const data = await response.json()
     console.log('OpenAI API response received');
     
-    const extractedText = data.choices[0]?.message?.content || 'No text could be extracted'
+    const text = data.choices[0]?.message?.content || 'Unable to extract text'
 
     // Delete the uploaded file after processing
     const { error: deleteError } = await supabase.storage
@@ -118,8 +118,8 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ text: extractedText }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      JSON.stringify({ text }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
     )
 
   } catch (error) {
