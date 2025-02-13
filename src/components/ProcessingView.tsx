@@ -2,15 +2,16 @@ import { Card } from "@/components/ui/card";
 import { ChatMessage } from '@/types';
 import { Button } from "@/components/ui/button";
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, AlignmentType } from "docx";
-import { Download, Loader2, Copy, Check } from "lucide-react";
+import { Download, Loader2, Copy, Check, ChevronLeft } from "lucide-react";
 import { useState } from "react";
 import { toast } from "react-hot-toast";
 
 interface ProcessingViewProps {
   messages: ChatMessage[];
+  onNavigateBack: () => void;
 }
 
-export function ProcessingView({ messages }: ProcessingViewProps) {
+export function ProcessingView({ messages, onNavigateBack }: ProcessingViewProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
 
@@ -187,6 +188,17 @@ export function ProcessingView({ messages }: ProcessingViewProps) {
 
   return (
     <div className="p-4 space-y-4">
+      <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onNavigateBack}
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </Button>
+        <h2 className="text-lg font-semibold">Results</h2>
+      </div>
+
       {messages.length === 0 && (
         <Card className="p-6 text-center">
           <div className="flex flex-col items-center gap-4">

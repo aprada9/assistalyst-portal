@@ -322,7 +322,10 @@ export default function Index() {
               />
             )}
             {currentStep === 'processing' && (
-              <ProcessingView messages={messages} />
+              <ProcessingView 
+                messages={messages} 
+                onNavigateBack={() => handleNavigate('initial')} 
+              />
             )}
           </ScrollArea>
         </Card>
