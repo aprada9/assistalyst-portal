@@ -1,9 +1,9 @@
-
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ChevronLeft, Link, Upload, Type, Sparkles } from 'lucide-react';
 import { DocumentFormData } from '@/types';
+import { Input } from "@/components/ui/input";
 
 interface SummaryFormProps {
   formData: DocumentFormData;
@@ -55,6 +55,17 @@ export const SummaryForm = ({ formData, onFormDataChange, onNavigateBack, onSubm
             </SelectItem>
           </SelectContent>
         </Select>
+
+        {formData.documentType === 'url' && (
+          <div className="space-y-2">
+            <Input
+              type="url"
+              placeholder="Enter URL (e.g., https://example.com/article)"
+              value={formData.pastedText}
+              onChange={(e) => onFormDataChange({ pastedText: e.target.value })}
+            />
+          </div>
+        )}
 
         {formData.documentType === 'paste' && (
           <Textarea

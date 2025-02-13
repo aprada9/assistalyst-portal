@@ -67,10 +67,21 @@ export default function Index() {
       setCurrentStep('processing');
       setMessages([]);
       
+      let textToProcess = formData.pastedText;
+
+      if (currentStep === 'summary' && formData.documentType === 'url') {
+        const { data: urlData, error: urlError } = await supabase.functions.invoke('process-url', {
+          body: { url: formData.pastedText }
+        });
+
+        if (urlError) throw new Error(urlError.message);
+        textToProcess = urlData.text;
+      }
+
       if (currentStep === 'summary') {
         const { data: processingData, error: processingError } = await supabase.functions.invoke('process-document', {
           body: {
-            text: formData.pastedText,
+            text: textToProcess,
             summaryType: formData.summaryType,
             summarySize: formData.summarySize
           }
