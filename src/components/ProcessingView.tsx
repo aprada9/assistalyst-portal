@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import { ChatMessage } from '@/types';
 import { Button } from "@/components/ui/button";
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, AlignmentType } from "docx";
-import { Download, Loader2 } from "lucide-react";
+import { Download, Loader2, Copy, Check } from "lucide-react";
 import { useState } from "react";
 import { toast } from "react-hot-toast";
 
@@ -12,6 +12,7 @@ interface ProcessingViewProps {
 
 export function ProcessingView({ messages }: ProcessingViewProps) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
 
   const parseHtmlToDocxElements = (htmlContent: string) => {
     // Clean up code fence markers
@@ -160,6 +161,30 @@ export function ProcessingView({ messages }: ProcessingViewProps) {
     }
   };
 
+  const handleCopyToClipboard = async () => {
+    try {
+      const lastMessage = messages[messages.length - 1];
+      if (!lastMessage) return;
+
+      // Clean up the content by removing HTML tags
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = lastMessage.content;
+      const cleanText = tempDiv.textContent || tempDiv.innerText;
+
+      await navigator.clipboard.writeText(cleanText);
+      setIsCopied(true);
+      toast.success('Text copied to clipboard!');
+
+      // Reset the copied state after 2 seconds
+      setTimeout(() => {
+        setIsCopied(false);
+      }, 2000);
+    } catch (error) {
+      console.error('Error copying to clipboard:', error);
+      toast.error('Failed to copy text to clipboard');
+    }
+  };
+
   return (
     <div className="p-4 space-y-4">
       {messages.length === 0 && (
@@ -195,7 +220,26 @@ export function ProcessingView({ messages }: ProcessingViewProps) {
       ))}
       
       {messages.length > 0 && (
-        <div className="flex justify-end mt-4">
+        <div className="flex justify-end gap-2 mt-4">
+          <Button
+            onClick={handleCopyToClipboard}
+            variant="outline"
+            className="flex items-center gap-2"
+            disabled={isCopied}
+          >
+            {isCopied ? (
+              <>
+                <Check className="h-4 w-4" />
+                Copied!
+              </>
+            ) : (
+              <>
+                <Copy className="h-4 w-4" />
+                Copy to Clipboard
+              </>
+            )}
+          </Button>
+
           <Button
             onClick={handleDownload}
             variant="outline"
