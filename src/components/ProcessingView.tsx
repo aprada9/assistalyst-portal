@@ -224,7 +224,7 @@ export function ProcessingView({ messages, onNavigateBack }: ProcessingViewProps
         >
           <div className="space-y-4">
             <div 
-              className="prose max-w-none"
+              className="prose max-w-none [&>ul]:list-disc [&>ul]:pl-6 [&>ul>li]:mt-2"
               dangerouslySetInnerHTML={{ __html: message.content }}
             />
           </div>

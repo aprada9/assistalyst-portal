@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
 
@@ -25,7 +24,7 @@ serve(async (req) => {
     console.log('Preparing request to OpenAI')
 
     // Prepare the prompt based on summary type and size
-    let prompt = `${summaryType === 'bullets' ? 'Create a bullet-point summary' : 'Write a comprehensive summary'} of the following text. `
+    let prompt = `${summaryType === 'bullets' ? 'Create a bullet-point summary using HTML <ul> and <li> tags' : 'Write a comprehensive summary using <p> tags'} of the following text. `
     
     switch (summarySize) {
       case 'quarter':

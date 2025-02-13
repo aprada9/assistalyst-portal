@@ -81,9 +81,14 @@ export default function Index() {
         }
 
         const result = processingData.summary;
+        const formattedResult = formData.summaryType === 'bullets' 
+          ? result.startsWith('<ul>') 
+            ? result 
+            : `<ul>${result.split('\n').map(point => `<li>${point.trim().replace(/^[•-]\s*/, '')}</li>`).join('')}</ul>`
+          : result;
 
         const messageData = {
-          content: result,
+          content: formattedResult,
           type: 'assistant',
           document_type: formData.documentType,
           summary_type: formData.summaryType,
@@ -107,7 +112,7 @@ export default function Index() {
           {
             id: Date.now().toString(),
             type: 'assistant',
-            content: result,
+            content: formattedResult,
             timestamp: new Date()
           }
         ]);
