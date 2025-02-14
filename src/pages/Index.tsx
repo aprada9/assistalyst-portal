@@ -66,24 +66,69 @@ export default function Index() {
     try {
       setError(null);
       setIsProcessing(true);
-      setCurrentStep('processing');
       setMessages([]);
       
-      let textToProcess = formData.pastedText;
+      if (currentStep === 'search') {
+        setIsSearching(true);
+        setSearchReferences([]);
+        setCurrentStep('processing');
 
-      if (currentStep === 'summary' && formData.documentType === 'url') {
-        const { data: urlData, error: urlError } = await supabase.functions.invoke('process-url', {
-          body: { url: formData.pastedText }
-        });
+        const { data: searchData, error: searchError } = await supabase.functions.invoke(
+          'process-search',
+          {
+            body: {
+              query: formData.searchQuery,
+              webSource: formData.webSource,
+              customWebs: formData.customWebs
+            }
+          }
+        );
 
-        if (urlError) throw new Error(urlError.message);
-        textToProcess = urlData.text;
-      }
+        if (searchError) {
+          throw new Error(searchError.message);
+        }
 
-      if (currentStep === 'summary') {
+        // Update references as they come in
+        if (searchData.references) {
+          console.log('Received references:', searchData.references);
+          setSearchReferences(searchData.references);
+        }
+
+        // Process the final result
+        const result = searchData.result;
+        
+        const messageData = {
+          content: result,
+          type: 'assistant',
+          web_source: formData.webSource,
+          search_query: formData.searchQuery,
+          custom_webs: formData.customWebs
+        };
+
+        const { error: insertError } = await supabase
+          .from('messages')
+          .insert([messageData]);
+
+        if (insertError) {
+          console.error('Error inserting message:', insertError);
+          throw new Error(insertError.message);
+        }
+
+        setMessages(prev => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            type: 'assistant',
+            content: result,
+            timestamp: new Date()
+          }
+        ]);
+
+        toast.success('Search completed!');
+      } else if (currentStep === 'summary') {
         const { data: processingData, error: processingError } = await supabase.functions.invoke('process-document', {
           body: {
-            text: textToProcess,
+            text: formData.pastedText,
             summaryType: formData.summaryType,
             summarySize: formData.summarySize
           }
@@ -131,61 +176,6 @@ export default function Index() {
         ]);
 
         toast.success('Summary generated!');
-      } else if (currentStep === 'search') {
-        setIsSearching(true);
-        setSearchReferences([]);
-
-        const { data: searchData, error: searchError } = await supabase.functions.invoke(
-          'process-search',
-          {
-            body: {
-              query: formData.searchQuery,
-              webSource: formData.webSource,
-              customWebs: formData.customWebs
-            }
-          }
-        );
-
-        if (searchError) {
-          throw new Error(searchError.message);
-        }
-
-        if (searchData.references) {
-          setSearchReferences(searchData.references);
-        }
-
-        setSearchResult(searchData);
-        const result = searchData.result;
-        
-        const messageData = {
-          content: result,
-          type: 'assistant',
-          web_source: formData.webSource,
-          search_query: formData.searchQuery,
-          custom_webs: formData.customWebs
-        };
-
-        const { error: insertError } = await supabase
-          .from('messages')
-          .insert([messageData]);
-
-        if (insertError) {
-          console.error('Error inserting message:', insertError);
-          throw new Error(insertError.message);
-        }
-
-        setMessages(prev => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            type: 'assistant',
-            content: result,
-            timestamp: new Date()
-          }
-        ]);
-
-        toast.success('Search completed!');
-        setIsSearching(false);
       } else if (currentStep === 'miniplex') {
         const { data: searchData, error: searchError } = await supabase.functions.invoke(
           'process-miniplex',

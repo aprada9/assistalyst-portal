@@ -61,7 +61,8 @@ serve(async (req) => {
         top_p: 0.9,
         max_tokens: 1000,
         return_images: false,
-        return_related_questions: true,
+        return_search_results: true,
+        return_references: true,
         search_domain_filter: searchDomainFilter.length > 0 ? searchDomainFilter : undefined,
         search_recency_filter: 'month',
         frequency_penalty: 1,
@@ -72,8 +73,12 @@ serve(async (req) => {
     const data = await response.json();
     console.log('Perplexity API response:', data);
 
-    // Extract citations from the response
-    const citations = data.references || [];
+    // Extract citations and references
+    const references = data.search_results || data.references || [];
+    const citations = references.map((ref: any, index: number) => ({
+      title: ref.title || ref.text || `Reference ${index + 1}`,
+      url: ref.url || ''
+    }));
 
     // Process the response to replace citation numbers with links
     let processedContent = data.choices[0].message.content;
@@ -98,10 +103,11 @@ serve(async (req) => {
       console.error('Error storing search result:', insertError);
     }
 
+    // Send an immediate response with references
     return new Response(
       JSON.stringify({
         result: processedContent,
-        citations,
+        references: citations,
         related_questions: data.related_questions || []
       }),
       {
