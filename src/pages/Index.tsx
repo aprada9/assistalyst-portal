@@ -31,6 +31,8 @@ export default function Index() {
     citations: Array<{ title: string; url: string }>;
     related_questions: string[];
   } | null>(null);
+  const [searchReferences, setSearchReferences] = useState<Array<{ title: string; url: string }>>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   const handleNavigate = (step: Step) => {
     setCurrentStep(step);
@@ -130,6 +132,9 @@ export default function Index() {
 
         toast.success('Summary generated!');
       } else if (currentStep === 'search') {
+        setIsSearching(true);
+        setSearchReferences([]);
+
         const { data: searchData, error: searchError } = await supabase.functions.invoke(
           'process-search',
           {
@@ -143,6 +148,10 @@ export default function Index() {
 
         if (searchError) {
           throw new Error(searchError.message);
+        }
+
+        if (searchData.references) {
+          setSearchReferences(searchData.references);
         }
 
         setSearchResult(searchData);
@@ -176,6 +185,7 @@ export default function Index() {
         ]);
 
         toast.success('Search completed!');
+        setIsSearching(false);
       } else if (currentStep === 'miniplex') {
         const { data: searchData, error: searchError } = await supabase.functions.invoke(
           'process-miniplex',
@@ -281,6 +291,7 @@ export default function Index() {
       toast.error('An error occurred. Please try again.');
     } finally {
       setIsProcessing(false);
+      setIsSearching(false);
     }
   };
 
@@ -342,6 +353,8 @@ export default function Index() {
               <ProcessingView 
                 messages={messages} 
                 onNavigateBack={() => handleNavigate('initial')} 
+                references={searchReferences}
+                isSearching={isSearching}
               />
             )}
           </ScrollArea>
