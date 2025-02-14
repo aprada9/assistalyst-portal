@@ -92,46 +92,39 @@ export const ProcessingView = ({
         >
           <ChevronLeft className="w-4 h-4" />
         </Button>
-        <h2 className="text-lg font-semibold">Results</h2>
+        <h2 className="text-lg font-semibold">Processing Results</h2>
       </div>
 
-      {isSearching && references.length === 0 && (
-        <Card className="p-6 text-center">
-          <div className="flex flex-col items-center gap-4">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-r-transparent" />
-            <div>
-              <h3 className="font-semibold">Searching...</h3>
-              <p className="text-sm text-muted-foreground">
-                Please wait while we process your query
-              </p>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {isSearching && references.length > 0 && (
+      {isSearching && (
         <Card className="p-4 bg-muted/50">
           <div className="flex items-center gap-2">
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-r-transparent" />
             <p className="text-sm text-muted-foreground">
-              Analyzing references...
+              Processing your query...
             </p>
           </div>
-          <div className="mt-3 space-y-2">
-            {references.map((ref, index) => (
-              <div key={index} className="text-sm flex items-start gap-2">
-                <span className="min-w-[20px] text-primary">[{index + 1}]</span>
-                <a 
-                  href={ref.url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
+          {references.length > 0 && (
+            <div className="mt-3 space-y-2">
+              <p className="text-sm font-medium">Found references:</p>
+              {references.map((ref, index) => (
+                <div 
+                  key={index} 
+                  className="text-sm flex items-start gap-2 animate-in slide-in-from-right duration-300"
+                  style={{ animationDelay: `${index * 150}ms` }}
                 >
-                  {ref.title || ref.url}
-                </a>
-              </div>
-            ))}
-          </div>
+                  <span className="min-w-[20px] text-primary">[{index + 1}]</span>
+                  <a 
+                    href={ref.url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline line-clamp-1"
+                  >
+                    {ref.url}
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
       )}
       

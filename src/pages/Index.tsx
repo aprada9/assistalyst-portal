@@ -73,6 +73,13 @@ export default function Index() {
         setSearchReferences([]);
         setCurrentStep('processing');
 
+        setMessages([{
+          id: Date.now().toString(),
+          type: 'assistant',
+          content: 'Processing your query...',
+          timestamp: new Date()
+        }]);
+
         const { data: searchData, error: searchError } = await supabase.functions.invoke(
           'process-search',
           {
@@ -88,13 +95,11 @@ export default function Index() {
           throw new Error(searchError.message);
         }
 
-        // Update references as they come in
         if (searchData.references) {
           console.log('Received references:', searchData.references);
           setSearchReferences(searchData.references);
         }
 
-        // Process the final result
         const result = searchData.result;
         
         const messageData = {
@@ -115,9 +120,8 @@ export default function Index() {
         }
 
         setMessages(prev => [
-          ...prev,
           {
-            id: Date.now().toString(),
+            id: prev[0].id,
             type: 'assistant',
             content: result,
             timestamp: new Date()
