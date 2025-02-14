@@ -73,18 +73,18 @@ serve(async (req) => {
     const data = await response.json();
     console.log('Perplexity API response:', data);
 
-    // Extract citations and references
-    const references = data.search_results || data.references || [];
-    const citations = references.map((ref: any, index: number) => ({
-      title: ref.title || ref.text || `Reference ${index + 1}`,
-      url: ref.url || ''
+    // Extract citations and process them into references
+    const citations = data.citations || [];
+    const references = citations.map((url: string, index: number) => ({
+      title: `Reference ${index + 1}`,
+      url: url
     }));
 
     // Process the response to replace citation numbers with links
     let processedContent = data.choices[0].message.content;
-    citations.forEach((citation: { title: string; url: string }, index: number) => {
+    references.forEach((reference: { title: string; url: string }, index: number) => {
       const citationMark = `[${index + 1}]`;
-      const citationLink = `<a href="${citation.url}" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline inline-flex items-center gap-1">${citationMark}<span class="text-xs text-muted-foreground">(${citation.title})</span></a>`;
+      const citationLink = `<a href="${reference.url}" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline inline-flex items-center gap-1">${citationMark}<span class="text-xs text-muted-foreground">(${reference.url})</span></a>`;
       processedContent = processedContent.replace(citationMark, citationLink);
     });
 
@@ -94,7 +94,7 @@ serve(async (req) => {
       .insert({
         query,
         result: processedContent,
-        citations,
+        citations: references,
         web_source: webSource,
         custom_webs: customWebs
       });
@@ -107,8 +107,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         result: processedContent,
-        references: citations,
-        related_questions: data.related_questions || []
+        references: references,
+        related_questions: []
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
