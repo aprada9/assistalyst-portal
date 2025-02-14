@@ -1,298 +1,29 @@
-import { useState } from 'react';
+
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ChatMessage, DocumentFormData, Step } from '@/types';
-import { toast } from 'sonner';
-import { supabase } from "@/integrations/supabase/client";
 import { MainOptions } from '@/components/main/MainOptions';
 import { SummaryForm } from '@/components/forms/SummaryForm';
 import { SearchForm } from '@/components/forms/SearchForm';
 import { MiniplexForm } from '@/components/forms/MiniplexForm';
 import { OcrForm } from '@/components/forms/OcrForm';
 import { ProcessingView } from '@/components/ProcessingView';
+import { useDocumentProcessing } from '@/hooks/useDocumentProcessing';
 
 export default function Index() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [currentStep, setCurrentStep] = useState<Step>('initial');
-  const [formData, setFormData] = useState<DocumentFormData>({
-    documentType: 'paste',
-    pastedText: '',
-    summaryType: 'general',
-    summarySize: 'quarter',
-    webSource: 'all',
-    searchQuery: '',
-    customWebs: '',
-    file: null
-  });
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [searchResult, setSearchResult] = useState<{
-    result: string;
-    citations: Array<{ title: string; url: string }>;
-    related_questions: string[];
-  } | null>(null);
-  const [searchReferences, setSearchReferences] = useState<Array<{ title: string; url: string }>>([]);
-  const [isSearching, setIsSearching] = useState(false);
-
-  const handleNavigate = (step: Step) => {
-    setCurrentStep(step);
-    if (step === 'initial') {
-      setFormData({
-        documentType: 'paste',
-        pastedText: '',
-        summaryType: 'general',
-        summarySize: 'quarter',
-        webSource: 'all',
-        searchQuery: '',
-        customWebs: '',
-        file: null
-      });
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setError(null);
-    const file = e.target.files?.[0];
-    if (file) {
-      setFormData(prev => ({ ...prev, file }));
-    }
-  };
-
-  const handleFormDataChange = (data: Partial<DocumentFormData>) => {
-    setFormData(prev => ({ ...prev, ...data }));
-  };
-
-  const handleSubmit = async () => {
-    try {
-      setError(null);
-      setIsProcessing(true);
-      setMessages([]);
-      
-      if (currentStep === 'search') {
-        setIsSearching(true);
-        setSearchReferences([]);
-        setCurrentStep('processing');
-
-        setMessages([{
-          id: Date.now().toString(),
-          type: 'assistant',
-          content: 'Processing your query...',
-          timestamp: new Date()
-        }]);
-
-        const { data: searchData, error: searchError } = await supabase.functions.invoke(
-          'process-search',
-          {
-            body: {
-              query: formData.searchQuery,
-              webSource: formData.webSource,
-              customWebs: formData.customWebs
-            }
-          }
-        );
-
-        if (searchError) {
-          throw new Error(searchError.message);
-        }
-
-        if (searchData.references) {
-          console.log('Received references:', searchData.references);
-          setSearchReferences(searchData.references);
-        }
-
-        const result = searchData.result;
-        
-        const messageData = {
-          content: result,
-          type: 'assistant',
-          web_source: formData.webSource,
-          search_query: formData.searchQuery,
-          custom_webs: formData.customWebs
-        };
-
-        const { error: insertError } = await supabase
-          .from('messages')
-          .insert([messageData]);
-
-        if (insertError) {
-          console.error('Error inserting message:', insertError);
-          throw new Error(insertError.message);
-        }
-
-        setMessages(prev => [
-          {
-            id: prev[0].id,
-            type: 'assistant',
-            content: result,
-            timestamp: new Date()
-          }
-        ]);
-
-        toast.success('Search completed!');
-      } else if (currentStep === 'summary') {
-        const { data: processingData, error: processingError } = await supabase.functions.invoke('process-document', {
-          body: {
-            text: formData.pastedText,
-            summaryType: formData.summaryType,
-            summarySize: formData.summarySize
-          }
-        });
-
-        if (processingError) {
-          throw new Error(processingError.message);
-        }
-
-        const result = processingData.summary;
-        const formattedResult = formData.summaryType === 'bullets' 
-          ? result.startsWith('<ul>') 
-            ? result 
-            : `<ul>${result.split('\n').map(point => `<li>${point.trim().replace(/^[•-]\s*/, '')}</li>`).join('')}</ul>`
-          : result;
-
-        const messageData = {
-          content: formattedResult,
-          type: 'assistant',
-          document_type: formData.documentType,
-          summary_type: formData.summaryType,
-          summary_size: formData.summarySize,
-          web_source: formData.webSource,
-          search_query: formData.searchQuery,
-          custom_webs: formData.customWebs
-        };
-
-        const { error: insertError } = await supabase
-          .from('messages')
-          .insert([messageData]);
-
-        if (insertError) {
-          console.error('Error inserting message:', insertError);
-          throw new Error(insertError.message);
-        }
-
-        setMessages(prev => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            type: 'assistant',
-            content: formattedResult,
-            timestamp: new Date()
-          }
-        ]);
-
-        toast.success('Summary generated!');
-      } else if (currentStep === 'miniplex') {
-        const { data: searchData, error: searchError } = await supabase.functions.invoke(
-          'process-miniplex',
-          {
-            body: {
-              query: formData.searchQuery,
-              webSource: formData.webSource,
-              customWebs: formData.customWebs
-            }
-          }
-        );
-
-        if (searchError) {
-          throw new Error(searchError.message);
-        }
-
-        setSearchResult(searchData);
-        const result = searchData.result;
-        
-        const messageData = {
-          content: result,
-          type: 'assistant',
-          web_source: formData.webSource,
-          search_query: formData.searchQuery,
-          custom_webs: formData.customWebs
-        };
-
-        const { error: insertError } = await supabase
-          .from('messages')
-          .insert([messageData]);
-
-        if (insertError) {
-          console.error('Error inserting message:', insertError);
-          throw new Error(insertError.message);
-        }
-
-        setMessages(prev => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            type: 'assistant',
-            content: result,
-            timestamp: new Date()
-          }
-        ]);
-
-        toast.success('MiniPlex search completed!');
-      } else if (currentStep === 'ocr') {
-        if (!formData.file) {
-          throw new Error('Please upload a file');
-        }
-
-        const formDataToSend = new FormData();
-        formDataToSend.append('file', formData.file);
-
-        const { data: ocrData, error: ocrError } = await supabase.functions.invoke(
-          'process-ocr',
-          {
-            body: formDataToSend
-          }
-        );
-
-        if (ocrError) {
-          throw new Error(ocrError.message);
-        }
-
-        const cleanResult = ocrData.text
-          .replace(/^```html\s*/, '')  // Remove opening ```html and any whitespace
-          .replace(/\s*```$/, '');     // Remove closing ``` and any whitespace
-
-        const messageData = {
-          content: cleanResult,
-          type: 'assistant'
-        };
-
-        const { error: insertError } = await supabase
-          .from('messages')
-          .insert([messageData]);
-
-        if (insertError) {
-          console.error('Error inserting message:', insertError);
-          throw new Error(insertError.message);
-        }
-
-        setMessages(prev => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            type: 'assistant',
-            content: cleanResult,
-            timestamp: new Date()
-          }
-        ]);
-
-        toast.success('Text extracted successfully!');
-      }
-    } catch (error) {
-      console.error('Error processing request:', error);
-      setError(error.message || 'An error occurred while processing the document');
-      if (currentStep === 'ocr') {
-        setCurrentStep('ocr');
-      }
-      toast.error('An error occurred. Please try again.');
-    } finally {
-      setIsProcessing(false);
-      setIsSearching(false);
-    }
-  };
-
-  const handleRelatedQuestionClick = (question: string) => {
-    setFormData(prev => ({ ...prev, searchQuery: question }));
-    handleSubmit();
-  };
+  const {
+    messages,
+    currentStep,
+    formData,
+    isProcessing,
+    error,
+    searchResult,
+    searchReferences,
+    isSearching,
+    handleNavigate,
+    handleFormDataChange,
+    handleFileChange,
+    handleSubmit
+  } = useDocumentProcessing();
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -330,7 +61,10 @@ export default function Index() {
                 onSubmit={handleSubmit}
                 searchResult={searchResult}
                 currentStep={currentStep}
-                onRelatedQuestionClick={handleRelatedQuestionClick}
+                onRelatedQuestionClick={(question) => {
+                  handleFormDataChange({ searchQuery: question });
+                  handleSubmit();
+                }}
               />
             )}
             {currentStep === 'ocr' && (
